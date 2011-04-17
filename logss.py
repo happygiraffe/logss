@@ -47,8 +47,13 @@ def main(argv):
 
   # TODO: print column names if no args given.
   # TODO: auto-detect column names, and apply to args in order.
-  args = dict(x.split('=', 1) for x in argv[2:])
-  client.InsertRow(args, key)
+  if len(argv) > 3:
+    args = dict(x.split('=', 1) for x in argv[2:])
+    client.InsertRow(args, key)
+  else:
+    list_feed = client.GetListFeed(key)
+    for col in sorted(list_feed.entry[0].custom.keys()):
+      print col
   return 0
 
 
