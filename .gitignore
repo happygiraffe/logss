@@ -1,1 +1,5 @@
 *.pyc
+
+# Libs for python.
+atom/
+gdata/
