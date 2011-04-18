@@ -65,16 +65,19 @@ class SpreadsheetInserter(object):
     """Are these just names, or do they have data (:)?"""
     return len([c for c in cols if ':' in c]) > 0
 
+  def InsertRow(self, data):
+    self.client.InsertRow(data, self.key, wksht_id=self.wkey)
+
   def InsertFromColumns(self, cols):
     # Data is mixed into column names.
     data = dict(c.split(':', 1) for c in cols)
-    self.client.InsertRow(data, self.key, wksht_id=self.wkey)
+    self.InsertRow(data)
 
   def InsertFromFileHandle(self, cols, fh):
     for line in fh:
       vals = line.rstrip().split()
       data = dict(zip(cols, vals))
-      self.client.InsertRow(data, self.key, wksht_id=self.wkey)
+      self.InsertRow(data)
 
   def ListColumns(self):
     list_feed = self.client.GetListFeed(self.key, wksht_id=self.wkey)
