@@ -39,10 +39,10 @@ def FindKeyOfSpreadsheet(client, name):
   return ExtractKey(spreadsheet[0])
 
 
-def FindKeyOfWorksheet(client, name):
+def FindKeyOfWorksheet(client, key, name):
   if name == 'default':
     return name
-  worksheets = client.GetWorksheetsFeed()
+  worksheets = client.GetWorksheetsFeed(key)
   worksheet = [w for w in worksheets.entry if w.title.text == name]
   if not worksheet:
     raise Error('Can\'t find worksheet named %s', name)
@@ -99,7 +99,7 @@ def main():
   Authenticate(client, opts.username)
 
   key = opts.key or FindKeyOfSpreadsheet(client, opts.name)
-  wkey = FindKeyOfWorksheet(client, opts.worksheet)
+  wkey = FindKeyOfWorksheet(client, key, opts.worksheet)
   if len(args) > 1:
     cols = args
     if ColumnNamesHaveData(cols):
@@ -113,7 +113,7 @@ def main():
         data = dict(zip(cols, vals))
         client.InsertRow(data, key, wksht_id=wkey)
   else:
-    list_feed = client.GetListFeed(key)
+    list_feed = client.GetListFeed(key, wksht_id=wkey)
     for col in sorted(list_feed.entry[0].custom.keys()):
       print col
   return 0
