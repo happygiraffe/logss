@@ -29,7 +29,7 @@ def ExtractKey(entry):
   return entry.id.text.split('/')[-1]
 
 
-def FindKeyOfSheet(client, name):
+def FindKeyOfSpreadsheet(client, name):
   spreadsheets = client.GetSpreadsheetsFeed()
   spreadsheet = [s for s in spreadsheets.entry if s.title.text == name]
   if not spreadsheet:
@@ -37,6 +37,18 @@ def FindKeyOfSheet(client, name):
   if len(spreadsheet) > 1:
     raise Error('More than one spreadsheet named %s', name)
   return ExtractKey(spreadsheet[0])
+
+
+def FindKeyOfWorksheet(client, name):
+  if name == 'default':
+    return name
+  worksheets = client.GetWorksheetsFeed()
+  worksheet = [w for w in worksheets.entry if w.title.text == name]
+  if not worksheet:
+    raise Error('Can\'t find worksheet named %s', name)
+  if len(worksheet) > 1:
+    raise Error('Many worksheets named %s', name)
+  return ExtractKey(worksheet[0])
 
 
 def DefineFlags():
@@ -57,6 +69,9 @@ One row will be added for each invocation of this program.
                     '(the value of the key= parameter in the URL)')
   parser.add_option('--name', dest='name',
                     help='The name of the spreadsheet to update')
+  parser.add_option('--worksheet', dest='worksheet',
+                    help='The name of the worksheet to update',
+                    default='default')
   parser.add_option('-u', '--username', dest='username',
                     help='Which username to log in as (default: %default)',
                     default='%s@gmail.com' % getpass.getuser())
@@ -74,10 +89,11 @@ def main():
   client.source = os.path.basename(sys.argv[0])
   Authenticate(client, opts.username)
 
-  key = opts.key or FindKeyOfSheet(client, opts.name)
+  key = opts.key or FindKeyOfSpreadsheet(client, opts.name)
+  wkey = FindKeyOfWorksheet(client, opts.worksheet)
   if len(args) > 1:
     args = dict(x.split(':', 1) for x in argv[1:])
-    client.InsertRow(args, key)
+    client.InsertRow(args, key, wksht_id=wkey)
   else:
     list_feed = client.GetListFeed(key)
     for col in sorted(list_feed.entry[0].custom.keys()):
