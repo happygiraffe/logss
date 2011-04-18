@@ -87,6 +87,11 @@ in order.
   return parser
 
 
+def PrintColumns(client, key, wkey):
+  list_feed = client.GetListFeed(key, wksht_id=wkey)
+  print('\n'.join(sorted(list_feed.entry[0].custom.keys())))
+
+
 def main():
   parser = DefineFlags()
   (opts, args) = parser.parse_args()
@@ -113,9 +118,7 @@ def main():
         data = dict(zip(cols, vals))
         client.InsertRow(data, key, wksht_id=wkey)
   else:
-    list_feed = client.GetListFeed(key, wksht_id=wkey)
-    for col in sorted(list_feed.entry[0].custom.keys()):
-      print col
+    PrintColumns(client, key, wkey)
   return 0
 
 
