@@ -44,10 +44,8 @@ def main(argv):
   Authenticate(client)
 
   key = FindKeyOfSheet(client, spreadsheet_name)
-
-  # TODO: auto-detect column names, and apply to args in order.
   if len(argv) > 3:
-    args = dict(x.split('=', 1) for x in argv[2:])
+    args = dict(x.split(':', 1) for x in argv[2:])
     client.InsertRow(args, key)
   else:
     list_feed = client.GetListFeed(key)
