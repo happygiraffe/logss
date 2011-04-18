@@ -87,6 +87,19 @@ in order.
   return parser
 
 
+def InsertFromColumns(client, key, wkey, cols):
+  # Data is mixed into column names.
+  data = dict(c.split(':', 1) for c in cols)
+  client.InsertRow(data, key, wksht_id=wkey)
+
+
+def InsertFromFileHandle(client, key, wkey, cols, fh):
+  for line in fh:
+    vals = line.rstrip().split()
+    data = dict(zip(cols, vals))
+    client.InsertRow(data, key, wksht_id=wkey)
+
+
 def PrintColumns(client, key, wkey):
   list_feed = client.GetListFeed(key, wksht_id=wkey)
   print('\n'.join(sorted(list_feed.entry[0].custom.keys())))
@@ -108,15 +121,10 @@ def main():
   if len(args) > 1:
     cols = args
     if ColumnNamesHaveData(cols):
-      # Data is mixed into column names.
-      data = dict(c.split(':', 1) for c in cols)
-      client.InsertRow(data, key, wksht_id=wkey)
+      InsertFromColumns(client, key, wkey, cols)
     else:
       # Read from stdin, pipe data to spreadsheet.
-      for line in sys.stdin:
-        vals = line.rstrip().split()
-        data = dict(zip(cols, vals))
-        client.InsertRow(data, key, wksht_id=wkey)
+      InsertFromFileHandle(client, key, wkey, cols, sys.stdin)
   else:
     PrintColumns(client, key, wkey)
   return 0
