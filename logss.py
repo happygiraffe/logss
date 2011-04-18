@@ -43,25 +43,23 @@ class SpreadsheetInserter(object):
     # This is what spreadsheetExample seems to do…
     return entry.id.text.split('/')[-1]
 
+  def FindKeyOfEntryNamed(self, feed, name, kind='spreadsheet'):
+    entry = [e for e in feed.entry if e.title.text == name]
+    if not entry:
+      raise Error('Can\'t find %s named %s', kind, name)
+    if len(entry) > 1:
+      raise Error('More than one %s named %s', kind, name)
+    return self.ExtractKey(entry[0])
+
   def FindKeyOfSpreadsheet(self, name):
     spreadsheets = self.client.GetSpreadsheetsFeed()
-    spreadsheet = [s for s in spreadsheets.entry if s.title.text == name]
-    if not spreadsheet:
-      raise Error('Can\'t find spreadsheet named %s', name)
-    if len(spreadsheet) > 1:
-      raise Error('More than one spreadsheet named %s', name)
-    return self.ExtractKey(spreadsheet[0])
+    return self.FindKeyOfEntryNamed(spreadsheets, name)
 
   def FindKeyOfWorksheet(self, name):
     if name == 'default':
       return name
     worksheets = self.client.GetWorksheetsFeed(self.key)
-    worksheet = [w for w in worksheets.entry if w.title.text == name]
-    if not worksheet:
-      raise Error('Can\'t find worksheet named %s', name)
-    if len(worksheet) > 1:
-      raise Error('Many worksheets named %s', name)
-    return self.ExtractKey(worksheet[0])
+    return self.FindKeyOfEntryNamed(worksheets, name, 'worksheet')
 
   def ColumnNamesHaveData(self, cols):
     """Are these just names, or do they have data (:)?"""
@@ -121,10 +119,8 @@ def main():
     parser.error('You must specify either --name or --key')
 
   inserter = SpreadsheetInserter(debug=opts.debug)
-
   password = getpass.getpass('Password for %s: ' % opts.username)
   inserter.Authenticate(opts.username, password)
-
   inserter.SetKey(opts.key, opts.name)
   inserter.SetWorksheetKey(opts.worksheet)
 
