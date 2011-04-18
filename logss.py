@@ -18,42 +18,62 @@ class Error(Exception):
   pass
 
 
-def Authenticate(client, username):
-  # TODO: OAuth.  We must be able to do this without a password.
-  client.ClientLogin(username,
-                     getpass.getpass('Password for %s: ' % username))
+class SpreadsheetInserter(object):
+  """A utility to insert rows into a spreadsheet."""
 
+  def __init__(self, debug=False):
+    self.client = gdata.spreadsheet.service.SpreadsheetsService()
+    self.client.debug = debug
+    self.client.source = os.path.basename(sys.argv[0])
+    self.key = None
+    self.wkey = None
 
-def ExtractKey(entry):
-  # This is what spreadsheetExample seems to do…
-  return entry.id.text.split('/')[-1]
+  def Authenticate(self, username, password):
+    # TODO: OAuth.  We must be able to do this without a password.
+    self.client.ClientLogin(username, password)
 
+  def ExtractKey(self, entry):
+    # This is what spreadsheetExample seems to do…
+    return entry.id.text.split('/')[-1]
 
-def FindKeyOfSpreadsheet(client, name):
-  spreadsheets = client.GetSpreadsheetsFeed()
-  spreadsheet = [s for s in spreadsheets.entry if s.title.text == name]
-  if not spreadsheet:
-    raise Error('Can\'t find spreadsheet named %s', name)
-  if len(spreadsheet) > 1:
-    raise Error('More than one spreadsheet named %s', name)
-  return ExtractKey(spreadsheet[0])
+  def FindKeyOfSpreadsheet(self, name):
+    spreadsheets = self.client.GetSpreadsheetsFeed()
+    spreadsheet = [s for s in spreadsheets.entry if s.title.text == name]
+    if not spreadsheet:
+      raise Error('Can\'t find spreadsheet named %s', name)
+    if len(spreadsheet) > 1:
+      raise Error('More than one spreadsheet named %s', name)
+    return self.ExtractKey(spreadsheet[0])
 
+  def FindKeyOfWorksheet(self, name):
+    if name == 'default':
+      return name
+    worksheets = self.client.GetWorksheetsFeed(self.key)
+    worksheet = [w for w in worksheets.entry if w.title.text == name]
+    if not worksheet:
+      raise Error('Can\'t find worksheet named %s', name)
+    if len(worksheet) > 1:
+      raise Error('Many worksheets named %s', name)
+    return self.ExtractKey(worksheet[0])
 
-def FindKeyOfWorksheet(client, key, name):
-  if name == 'default':
-    return name
-  worksheets = client.GetWorksheetsFeed(key)
-  worksheet = [w for w in worksheets.entry if w.title.text == name]
-  if not worksheet:
-    raise Error('Can\'t find worksheet named %s', name)
-  if len(worksheet) > 1:
-    raise Error('Many worksheets named %s', name)
-  return ExtractKey(worksheet[0])
+  def ColumnNamesHaveData(self, cols):
+    """Are these just names, or do they have data (:)?"""
+    return len([c for c in cols if ':' in c]) > 0
 
+  def InsertFromColumns(self, cols):
+    # Data is mixed into column names.
+    data = dict(c.split(':', 1) for c in cols)
+    self.client.InsertRow(data, self.key, wksht_id=self.wkey)
 
-def ColumnNamesHaveData(cols):
-  """Are these just names, or do they have data (:)?"""
-  return len([c for c in cols if ':' in c]) > 0
+  def InsertFromFileHandle(self, cols, fh):
+    for line in fh:
+      vals = line.rstrip().split()
+      data = dict(zip(cols, vals))
+      self.client.InsertRow(data, self.key, wksht_id=self.wkey)
+
+  def PrintColumns(self):
+    list_feed = self.client.GetListFeed(self.key, wksht_id=self.wkey)
+    print('\n'.join(sorted(list_feed.entry[0].custom.keys())))
 
 
 def DefineFlags():
@@ -87,46 +107,29 @@ in order.
   return parser
 
 
-def InsertFromColumns(client, key, wkey, cols):
-  # Data is mixed into column names.
-  data = dict(c.split(':', 1) for c in cols)
-  client.InsertRow(data, key, wksht_id=wkey)
-
-
-def InsertFromFileHandle(client, key, wkey, cols, fh):
-  for line in fh:
-    vals = line.rstrip().split()
-    data = dict(zip(cols, vals))
-    client.InsertRow(data, key, wksht_id=wkey)
-
-
-def PrintColumns(client, key, wkey):
-  list_feed = client.GetListFeed(key, wksht_id=wkey)
-  print('\n'.join(sorted(list_feed.entry[0].custom.keys())))
-
-
 def main():
   parser = DefineFlags()
   (opts, args) = parser.parse_args()
   if (not opts.name and not opts.key) or (opts.name and opts.key):
     parser.error('You must specify either --name or --key')
 
-  client = gdata.spreadsheet.service.SpreadsheetsService()
-  client.debug = opts.debug
-  client.source = os.path.basename(sys.argv[0])
-  Authenticate(client, opts.username)
+  inserter = SpreadsheetInserter(debug=opts.debug)
 
-  key = opts.key or FindKeyOfSpreadsheet(client, opts.name)
-  wkey = FindKeyOfWorksheet(client, key, opts.worksheet)
+  password = getpass.getpass('Password for %s: ' % opts.username)
+  inserter.Authenticate(opts.username, password)
+
+  inserter.key = opts.key or inserter.FindKeyOfSpreadsheet(opts.name)
+  inserter.wkey = inserter.FindKeyOfWorksheet(opts.worksheet)
+
   if len(args) > 1:
     cols = args
-    if ColumnNamesHaveData(cols):
-      InsertFromColumns(client, key, wkey, cols)
+    if inserter.ColumnNamesHaveData(cols):
+      inserter.InsertFromColumns(cols)
     else:
       # Read from stdin, pipe data to spreadsheet.
-      InsertFromFileHandle(client, key, wkey, cols, sys.stdin)
+      inserter.InsertFromFileHandle(cols, sys.stdin)
   else:
-    PrintColumns(client, key, wkey)
+    inserter.PrintColumns()
   return 0
 
 
