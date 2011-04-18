@@ -3,7 +3,7 @@ logss
 
 This is a small tool to log data to a Google Spreadsheet.  Google Spreadsheets are very handy for manipulating data, but it's less easy to insert data programmatically.
 
-In order to use this, you'll need the [python gdata client][pygdata] in PYTHONPATH, e.g.
+In order to use this, you'll need the [python gdata client][pygdata] in `PYTHONPATH`, e.g.
 
     $ export PYTHONPATH="/opt/google/gdata-2.0.14/src"
     $ python logss.py "Spreadsheet Name" col1:val1 col2:val2 …
