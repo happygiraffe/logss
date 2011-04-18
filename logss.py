@@ -34,6 +34,8 @@ def FindKeyOfSheet(client, name):
   spreadsheet = [s for s in spreadsheets.entry if s.title.text == name]
   if not spreadsheet:
     raise Error('Can\'t find spreadsheet named %s', name)
+  if len(spreadsheet) > 1:
+    raise Error('More than one spreadsheet named %s', name)
   return ExtractKey(spreadsheet[0])
 
 
