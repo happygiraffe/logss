@@ -78,9 +78,9 @@ class SpreadsheetInserter(object):
       data = dict(zip(cols, vals))
       self.client.InsertRow(data, self.key, wksht_id=self.wkey)
 
-  def PrintColumns(self):
+  def ListColumns(self):
     list_feed = self.client.GetListFeed(self.key, wksht_id=self.wkey)
-    print('\n'.join(sorted(list_feed.entry[0].custom.keys())))
+    return sorted(list_feed.entry[0].custom.keys())
 
 
 def DefineFlags():
@@ -136,7 +136,7 @@ def main():
       # Read from stdin, pipe data to spreadsheet.
       inserter.InsertFromFileHandle(cols, sys.stdin)
   else:
-    inserter.PrintColumns()
+    print('\n'.join(inserter.ListColumns()))
   return 0
 
 
