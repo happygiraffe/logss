@@ -51,6 +51,11 @@ def FindKeyOfWorksheet(client, name):
   return ExtractKey(worksheet[0])
 
 
+def ColumnNamesHaveData(cols):
+  """Are these just names, or do they have data (:)?"""
+  return len([c for c in cols if ':' in c]) > 0
+
+
 def DefineFlags():
   usage = u"""usage: %prog [options] [col1:va1 …]"""
   desc = """
@@ -60,6 +65,10 @@ With no further arguments, a list of column names will be printed to stdout.
 
 Otherwise, remaining arguments should be of the form `columnname:value'.
 One row will be added for each invocation of this program.
+
+If you just specify column names (without a value), then data will be read
+from stdin in whitespace delimited form, and mapped to each column name
+in order.
   """
   parser = optparse.OptionParser(usage=usage, description=desc)
   parser.add_option('--debug', dest='debug', action='store_true',
@@ -92,8 +101,17 @@ def main():
   key = opts.key or FindKeyOfSpreadsheet(client, opts.name)
   wkey = FindKeyOfWorksheet(client, opts.worksheet)
   if len(args) > 1:
-    args = dict(x.split(':', 1) for x in argv[1:])
-    client.InsertRow(args, key, wksht_id=wkey)
+    cols = args
+    if ColumnNamesHaveData(cols):
+      # Data is mixed into column names.
+      data = dict(c.split(':', 1) for c in cols)
+      client.InsertRow(data, key, wksht_id=wkey)
+    else:
+      # Read from stdin, pipe data to spreadsheet.
+      for line in sys.stdin:
+        vals = line.rstrip().split()
+        data = dict(zip(cols, vals))
+        client.InsertRow(data, key, wksht_id=wkey)
   else:
     list_feed = client.GetListFeed(key)
     for col in sorted(list_feed.entry[0].custom.keys()):
