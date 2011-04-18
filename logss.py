@@ -7,21 +7,20 @@ __author__ = 'Dominic Mitchell <dom@happygiraffe.net>'
 
 
 import getpass
+import optparse
 import sys
 
 import gdata.spreadsheet.service
-
-
-WHOM = 'dom@happygiraffe.net'
 
 
 class Error(Exception):
   pass
 
 
-def Authenticate(client):
+def Authenticate(client, username):
   # TODO: OAuth.  We must be able to do this without a password.
-  client.ClientLogin(WHOM, getpass.getpass('Password for %s: ' % WHOM))
+  client.ClientLogin(username,
+                     getpass.getpass('Password for %s: ' % username))
 
 
 def ExtractKey(entry):
@@ -39,15 +38,35 @@ def FindKeyOfSheet(client, name):
   return ExtractKey(spreadsheet[0])
 
 
-def main(argv):
-  spreadsheet_name = argv[1]
+def DefineFlags():
+  usage = u"""usage: %prog [options] [spreadsheet_name] [col1:va1 …]
+
+  If no column:value pairs are specified, a list of available columns will be
+  printed on stdout.
+  """
+  parser = optparse.OptionParser(usage=usage)
+  parser.add_option('--debug', dest='debug', action='store_true',
+                    help='Enable debug output', default=False)
+  parser.add_option('-u', '--username', dest='username',
+                    help='Which username to log in as (default: %default)',
+                    default='%s@gmail.com' % getpass.getuser())
+  return parser
+
+
+def main():
+  parser = DefineFlags()
+  (opts, args) = parser.parse_args()
+  if not args:
+    parser.error('You must specify a spreadsheet name.')
+  spreadsheet_name = args[0]
 
   client = gdata.spreadsheet.service.SpreadsheetsService()
-  Authenticate(client)
+  client.debug = opts.debug
+  Authenticate(client, opts.username)
 
   key = FindKeyOfSheet(client, spreadsheet_name)
-  if len(argv) > 3:
-    args = dict(x.split(':', 1) for x in argv[2:])
+  if len(args) > 1:
+    args = dict(x.split(':', 1) for x in argv[1:])
     client.InsertRow(args, key)
   else:
     list_feed = client.GetListFeed(key)
@@ -57,4 +76,4 @@ def main(argv):
 
 
 if __name__ == '__main__':
-  sys.exit(main(sys.argv))
+  sys.exit(main())
