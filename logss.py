@@ -36,6 +36,9 @@ class SpreadsheetInserter(object):
     """Set the key value, or if None, look up name and set key from that."""
     self.key = key or self.FindKeyOfSpreadsheet(name)
 
+  def SetWorksheetKey(self, worksheet_name):
+    self.wkey = self.FindKeyOfWorksheet(worksheet_name)
+
   def ExtractKey(self, entry):
     # This is what spreadsheetExample seems to do…
     return entry.id.text.split('/')[-1]
@@ -123,7 +126,7 @@ def main():
   inserter.Authenticate(opts.username, password)
 
   inserter.SetKey(opts.key, opts.name)
-  inserter.wkey = inserter.FindKeyOfWorksheet(opts.worksheet)
+  inserter.SetWorksheetKey(opts.worksheet)
 
   if len(args) > 1:
     cols = args
