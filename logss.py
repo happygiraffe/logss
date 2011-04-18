@@ -32,6 +32,10 @@ class SpreadsheetInserter(object):
     # TODO: OAuth.  We must be able to do this without a password.
     self.client.ClientLogin(username, password)
 
+  def SetKey(self, key, name):
+    """Set the key value, or if None, look up name and set key from that."""
+    self.key = key or self.FindKeyOfSpreadsheet(name)
+
   def ExtractKey(self, entry):
     # This is what spreadsheetExample seems to do…
     return entry.id.text.split('/')[-1]
@@ -118,7 +122,7 @@ def main():
   password = getpass.getpass('Password for %s: ' % opts.username)
   inserter.Authenticate(opts.username, password)
 
-  inserter.key = opts.key or inserter.FindKeyOfSpreadsheet(opts.name)
+  inserter.SetKey(opts.key, opts.name)
   inserter.wkey = inserter.FindKeyOfWorksheet(opts.worksheet)
 
   if len(args) > 1:
