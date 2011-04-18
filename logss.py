@@ -8,6 +8,7 @@ __author__ = 'Dominic Mitchell <dom@happygiraffe.net>'
 
 import getpass
 import optparse
+import os
 import sys
 
 import gdata.spreadsheet.service
@@ -70,6 +71,7 @@ def main():
 
   client = gdata.spreadsheet.service.SpreadsheetsService()
   client.debug = opts.debug
+  client.source = os.path.basename(sys.argv[0])
   Authenticate(client, opts.username)
 
   key = opts.key or FindKeyOfSheet(client, opts.name)
