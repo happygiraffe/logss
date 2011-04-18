@@ -39,12 +39,16 @@ def FindKeyOfSheet(client, name):
 
 
 def DefineFlags():
-  usage = u"""usage: %prog [options] [spreadsheet_name] [col1:va1 …]
+  usage = u"""usage: %prog [options] spreadsheet_name [col1:va1 …]"""
+  desc = """
+Log data into a Google Spreadsheet.
 
-  If no column:value pairs are specified, a list of available columns will be
-  printed on stdout.
+With no further arguments, a list of column names will be printed to stdout.
+
+Otherwise, remaining arguments should be of the form `columnname:value'.
+One row will be added for each invocation of this program.
   """
-  parser = optparse.OptionParser(usage=usage)
+  parser = optparse.OptionParser(usage=usage, description=desc)
   parser.add_option('--debug', dest='debug', action='store_true',
                     help='Enable debug output', default=False)
   parser.add_option('-u', '--username', dest='username',
