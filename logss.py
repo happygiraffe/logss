@@ -39,7 +39,7 @@ def FindKeyOfSheet(client, name):
 
 
 def DefineFlags():
-  usage = u"""usage: %prog [options] spreadsheet_name [col1:va1 …]"""
+  usage = u"""usage: %prog [options] [col1:va1 …]"""
   desc = """
 Log data into a Google Spreadsheet.
 
@@ -51,6 +51,11 @@ One row will be added for each invocation of this program.
   parser = optparse.OptionParser(usage=usage, description=desc)
   parser.add_option('--debug', dest='debug', action='store_true',
                     help='Enable debug output', default=False)
+  parser.add_option('--key', dest='key',
+                    help='The key of the spreadsheet to update '
+                    '(the value of the key= parameter in the URL)')
+  parser.add_option('--name', dest='name',
+                    help='The name of the spreadsheet to update')
   parser.add_option('-u', '--username', dest='username',
                     help='Which username to log in as (default: %default)',
                     default='%s@gmail.com' % getpass.getuser())
@@ -60,15 +65,14 @@ One row will be added for each invocation of this program.
 def main():
   parser = DefineFlags()
   (opts, args) = parser.parse_args()
-  if not args:
-    parser.error('You must specify a spreadsheet name.')
-  spreadsheet_name = args[0]
+  if (not opts.name and not opts.key) or (opts.name and opts.key):
+    parser.error('You must specify either --name or --key')
 
   client = gdata.spreadsheet.service.SpreadsheetsService()
   client.debug = opts.debug
   Authenticate(client, opts.username)
 
-  key = FindKeyOfSheet(client, spreadsheet_name)
+  key = opts.key or FindKeyOfSheet(client, opts.name)
   if len(args) > 1:
     args = dict(x.split(':', 1) for x in argv[1:])
     client.InsertRow(args, key)

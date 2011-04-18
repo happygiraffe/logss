@@ -20,7 +20,6 @@ TODO
 Right now this is a proof of concept, and there are many enhancements needed:
 
  - Use OAuth so we don't have to prompt for a password each time.
- - Allow specification of a spreadsheet by either name or key parameter.
  - Allow choosing a worksheet.
  - Read data from stdin as well as command line.
 
