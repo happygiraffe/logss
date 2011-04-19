@@ -21,11 +21,11 @@ If you need to know what the valid column names are, leave off the data from the
     col1
     col2
 
+Note that `logss` uses OAuth, so the first time that you use it, you will be prompted with an URL to visit in order to allow `logss` access to your google docs.
+
 TODO
 ----
 
-Right now this is a proof of concept, and there are many enhancements needed:
-
- - Use OAuth so we don't have to prompt for a password each time.
+ - Add a `setup.py` to allow installation.
 
  [pygdata]: http://code.google.com/p/gdata-python-client/
