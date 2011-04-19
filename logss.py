@@ -162,7 +162,7 @@ class SpreadsheetInserter(object):
 
   def InsertFromFileHandle(self, cols, fh):
     for line in fh:
-      vals = line.rstrip().split()
+      vals = line.rstrip().split(None, len(cols) - 1)
       data = dict(zip(cols, vals))
       self.InsertRow(data)
 
