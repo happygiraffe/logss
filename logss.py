@@ -3,19 +3,103 @@
 
 """Log a row to a Google Spreadsheet."""
 
+
 __author__ = 'Dominic Mitchell <dom@happygiraffe.net>'
 
 
-import getpass
+import pickle
 import optparse
 import os
 import sys
 
+import gdata.gauth
 import gdata.spreadsheet.service
+
+import oneshot
+
+
+# OAuth bits.  We use “anonymous” to behave as an unregistered application.
+# http://code.google.com/apis/accounts/docs/OAuth_ref.html#SigningOAuth
+CONSUMER_KEY = 'anonymous'
+CONSUMER_SECRET = 'anonymous'
+# The bits we actually need to access.
+SCOPES = ['https://spreadsheets.google.com/feeds/']
 
 
 class Error(Exception):
   pass
+
+
+class TokenStore(object):
+  """Store and retreive OAuth access tokens."""
+
+  def __init__(self, token_file=None):
+    default = os.path.expanduser('~/.%s.tok' % os.path.basename(sys.argv[0]))
+    self.token_file = token_file or default
+
+  def ReadToken(self):
+    """Read in the stored auth token object.
+
+    Returns:
+      The stored token object, or None.
+    """
+    try:
+      with open(self.token_file, 'rb') as fh:
+        return pickle.load(fh)
+    except IOError, e:
+      return None
+
+  def WriteToken(self, tok):
+    """Write the token object to a file."""
+    with open(self.token_file, 'wb') as fh:
+      os.fchmod(fh.fileno(), 0600)
+      pickle.dump(tok, fh)
+
+
+class ClientAuthorizer(object):
+  """Add authorization to a client."""
+
+  def __init__(self, consumer_key=CONSUMER_KEY,
+               consumer_secret=CONSUMER_SECRET, scopes=None,
+               token_store=None):
+    """Construct a new ClientAuthorizer."""
+    self.consumer_key = consumer_key
+    self.consumer_secret = consumer_secret
+    self.scopes = scopes or list(SCOPES)
+    self.token_store = token_store or TokenStore()
+
+  def FetchAccessToken(self, client):
+    # http://code.google.com/apis/gdata/docs/auth/oauth.html#Examples
+    httpd = oneshot.ParamsReceiverServer()
+    client.SetOAuthInputParameters(
+        gdata.auth.OAuthSignatureMethod.HMAC_SHA1,
+        self.consumer_key,
+        consumer_secret=self.consumer_secret)
+    request_token = client.FetchOAuthRequestToken(
+        scopes=self.scopes,
+        extra_parameters={'xoauth_displayname': 'logss'})
+    url = client.GenerateOAuthAuthorizationURL(
+        request_token,
+        callback_url=httpd.my_url())
+    print 'Please visit this URL to continue authorization:'
+    print url
+    httpd.serve_until_result()
+    gdata.gauth.AuthorizeRequestToken(request_token, httpd.result)
+    return client.UpgradeToOAuthAccessToken(request_token)
+
+  def EnsureAuthToken(self, client):
+    """Ensure client.auth_token is valid.
+
+    If a stored token is available, it will be used.  Otherwise, this goes
+    through the OAuth rituals described at:
+
+    As a side effect, this also reads and stores the token in a file.
+    """
+    access_token = self.token_store.ReadToken()
+    if not access_token:
+      access_token = self.FetchAccessToken(client)
+      self.token_store.WriteToken(access_token)
+    client.SetOAuthToken(access_token)
 
 
 class SpreadsheetInserter(object):
@@ -28,9 +112,9 @@ class SpreadsheetInserter(object):
     self.key = None
     self.wkey = None
 
-  def Authenticate(self, username, password):
-    # TODO: OAuth.  We must be able to do this without a password.
-    self.client.ClientLogin(username, password)
+  def Authenticate(self):
+    client_authz = ClientAuthorizer()
+    client_authz.EnsureAuthToken(self.client)
 
   def SetKey(self, key, name):
     """Set the key value, or if None, look up name and set key from that."""
@@ -109,9 +193,6 @@ in order.
   parser.add_option('--worksheet', dest='worksheet',
                     help='The name of the worksheet to update',
                     default='default')
-  parser.add_option('-u', '--username', dest='username',
-                    help='Which username to log in as (default: %default)',
-                    default='%s@gmail.com' % getpass.getuser())
   return parser
 
 
@@ -122,8 +203,7 @@ def main():
     parser.error('You must specify either --name or --key')
 
   inserter = SpreadsheetInserter(debug=opts.debug)
-  password = getpass.getpass('Password for %s: ' % opts.username)
-  inserter.Authenticate(opts.username, password)
+  inserter.Authenticate()
   inserter.SetKey(opts.key, opts.name)
   inserter.SetWorksheetKey(opts.worksheet)
 
