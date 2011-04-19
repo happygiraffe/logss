@@ -61,12 +61,16 @@ class ClientAuthorizer(object):
 
   def __init__(self, consumer_key=CONSUMER_KEY,
                consumer_secret=CONSUMER_SECRET, scopes=None,
-               token_store=None):
+               token_store=None, logger=None):
     """Construct a new ClientAuthorizer."""
     self.consumer_key = consumer_key
     self.consumer_secret = consumer_secret
     self.scopes = scopes or list(SCOPES)
     self.token_store = token_store or TokenStore()
+    self.logger = self.LogToStdout
+
+  def LogToStdout(self, msg):
+    print msg
 
   def FetchAccessToken(self, client):
     # http://code.google.com/apis/gdata/docs/auth/oauth.html#Examples
@@ -81,8 +85,7 @@ class ClientAuthorizer(object):
     url = client.GenerateOAuthAuthorizationURL(
         request_token,
         callback_url=httpd.my_url())
-    print 'Please visit this URL to continue authorization:'
-    print url
+    self.logger('Please visit this URL to authorize: ' + url)
     httpd.serve_until_result()
     gdata.gauth.AuthorizeRequestToken(request_token, httpd.result)
     return client.UpgradeToOAuthAccessToken(request_token)
@@ -112,8 +115,8 @@ class SpreadsheetInserter(object):
     self.key = None
     self.wkey = None
 
-  def Authenticate(self):
-    client_authz = ClientAuthorizer()
+  def Authenticate(self, logger=None):
+    client_authz = ClientAuthorizer(logger=logger)
     client_authz.EnsureAuthToken(self.client)
 
   def SetKey(self, key, name):
