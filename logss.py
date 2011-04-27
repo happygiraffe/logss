@@ -13,7 +13,7 @@ import os
 import sys
 
 import gdata.gauth
-import gdata.spreadsheet.service
+import gdata.spreadsheets.client
 
 import oneshot
 
@@ -75,20 +75,15 @@ class ClientAuthorizer(object):
   def FetchAccessToken(self, client):
     # http://code.google.com/apis/gdata/docs/auth/oauth.html#Examples
     httpd = oneshot.ParamsReceiverServer()
-    client.SetOAuthInputParameters(
-        gdata.auth.OAuthSignatureMethod.HMAC_SHA1,
-        self.consumer_key,
-        consumer_secret=self.consumer_secret)
-    request_token = client.FetchOAuthRequestToken(
-        scopes=self.scopes,
-        extra_parameters={'xoauth_displayname': 'logss'})
-    url = client.GenerateOAuthAuthorizationURL(
-        request_token,
-        callback_url=httpd.my_url())
-    self.logger('Please visit this URL to authorize: ' + url)
+
+    # TODO Find a way to pass "xoauth_displayname" parameter.
+    request_token = client.GetOAuthToken(
+        self.scopes, httpd.my_url(), self.consumer_key, self.consumer_secret)
+    url = request_token.generate_authorization_url()
+    self.logger('Please visit this URL to authorize: %s' % url)
     httpd.serve_until_result()
     gdata.gauth.AuthorizeRequestToken(request_token, httpd.result)
-    return client.UpgradeToOAuthAccessToken(request_token)
+    return client.GetAccessToken(request_token)
 
   def EnsureAuthToken(self, client):
     """Ensure client.auth_token is valid.
@@ -96,21 +91,64 @@ class ClientAuthorizer(object):
     If a stored token is available, it will be used.  Otherwise, this goes
     through the OAuth rituals described at:
 
+    http://code.google.com/apis/gdata/docs/auth/oauth.html
+
     As a side effect, this also reads and stores the token in a file.
     """
     access_token = self.token_store.ReadToken()
     if not access_token:
       access_token = self.FetchAccessToken(client)
       self.token_store.WriteToken(access_token)
-    client.SetOAuthToken(access_token)
+    client.auth_token = access_token
+
+
+# The next three classes are overrides to add missing functionality in the
+# python-gdata-client.
+
+class MyListEntry(gdata.spreadsheets.data.ListEntry):
+
+  def CustomFields(self):
+    """Return the names of all child elements in the GSX namespace."""
+    ns = gdata.spreadsheets.data.GSX_NAMESPACE
+    return [el.tag for el in self.get_elements(namespace=ns)]
+
+
+class MyListsFeed(gdata.spreadsheets.data.ListsFeed):
+
+  entry = [MyListEntry]
+
+  def ColumnNames(self):
+    if not self.entry:
+      return []
+    return self.entry[0].CustomFields()
+
+
+class MySpreadsheetsClient(gdata.spreadsheets.client.SpreadsheetsClient):
+  """Add in support for List feeds."""
+
+  LISTS_URL = 'https://spreadsheets.google.com/feeds/list/%s/%s/private/full'
+
+  def get_list_feed(self, key, wksht_id='default', **kwargs):
+    return self.get_feed(self.LISTS_URL % (key, wksht_id),
+                         desired_class=MyListsFeed, **kwargs)
+
+  GetListFeed = get_list_feed
+
+  def insert_row(self, data, key, wksht_id='default'):
+    new_entry = MyListEntry()
+    for k, v in data.iteritems():
+      new_entry.set_value(k, v)
+    return self.post(new_entry, self.LISTS_URL % (key, wksht_id))
+
+  InsertRow = insert_row
 
 
 class SpreadsheetInserter(object):
   """A utility to insert rows into a spreadsheet."""
 
   def __init__(self, debug=False):
-    self.client = gdata.spreadsheet.service.SpreadsheetsService()
-    self.client.debug = debug
+    self.client = MySpreadsheetsClient()
+    self.client.http_client.debug = debug
     self.client.source = os.path.basename(sys.argv[0])
     self.key = None
     self.wkey = None
@@ -139,13 +177,13 @@ class SpreadsheetInserter(object):
     return self.ExtractKey(entry[0])
 
   def FindKeyOfSpreadsheet(self, name):
-    spreadsheets = self.client.GetSpreadsheetsFeed()
+    spreadsheets = self.client.GetSpreadsheets()
     return self.FindKeyOfEntryNamed(spreadsheets, name)
 
   def FindKeyOfWorksheet(self, name):
     if name == 'default':
       return name
-    worksheets = self.client.GetWorksheetsFeed(self.key)
+    worksheets = self.client.GetWorksheets(self.key)
     return self.FindKeyOfEntryNamed(worksheets, name, 'worksheet')
 
   def ColumnNamesHaveData(self, cols):
@@ -168,7 +206,7 @@ class SpreadsheetInserter(object):
 
   def ListColumns(self):
     list_feed = self.client.GetListFeed(self.key, wksht_id=self.wkey)
-    return sorted(list_feed.entry[0].custom.keys())
+    return sorted(list_feed.ColumnNames())
 
 
 def DefineFlags():
